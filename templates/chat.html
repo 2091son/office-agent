@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="chat-container">
+    <div class="chat-header">
+        <h2>AI 办公助手</h2>
+        <p>生成周报 · 整理会议纪要 · 处理表格 · 发送通知 · 搜索知识库</p>
+    </div>
+    <div id="chatMessages" class="chat-messages"></div>
+    <div class="chat-input">
+        <input type="text" id="userInput" placeholder="试试：帮我写一份本周的周报..." autofocus>
+        <button id="sendBtn" class="btn-primary">发送</button>
+    </div>
+</div>
+<script>
+const token = localStorage.getItem('token');
+if (!token) window.location.href = '/';
+
+const ws = new WebSocket(`ws://${location.host}/ws/chat?token=${token}`);
+
+ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.type === 'reply') {
+        addMessage('assistant', data.content, data.tools);
+    } else if (data.type === 'error') {
+        addMessage('error', data.content);
+    }
+};
+
+function addMessage(role, content, tools) {
+    const div = document.createElement('div');
+    div.className = `message ${role}`;
+    let html = `<div class="message-content">${content.replace(/\n/g, '<br>')}</div>`;
+    if (tools && tools.length > 0) {
+        html += `<div class="tool-info">调用了 ${tools.length} 个工具</div>`;
+    }
+    div.innerHTML = html;
+    document.getElementById('chatMessages').appendChild(div);
+    div.scrollIntoView({behavior: 'smooth'});
+}
+
+function sendMessage() {
+    const input = document.getElementById('userInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+    addMessage('user', msg);
+    ws.send(JSON.stringify({message: msg}));
+    input.value = '';
+}
+
+document.getElementById('sendBtn').addEventListener('click', sendMessage);
+document.getElementById('userInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMessage();
+});
+</script>
+{% endblock %}

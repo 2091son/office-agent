@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 办公助手</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav>
+        <a href="/chat">AI 办公助手</a>
+        <span id="userInfo"></span>
+        <a href="#" onclick="logout()">退出</a>
+    </nav>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    <script>
+        if (localStorage.getItem('token')) {
+            fetch('/chat', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } });
+        }
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>
