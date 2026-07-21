@@ -156,11 +156,48 @@ def process_excel(action: str, data_description: str, numbers: str = "") -> str:
         return f"操作：{action}\n数据描述：{data_description}\n结果：处理后的数据 = {sorted_nums}"
 
 
-def send_notification(recipient: str, message: str, priority: str = "普通") -> str:
-    """发送通知（模拟，实际项目中接邮件 API）"""
-    priority_emoji = "🔴" if priority == "紧急" else "🟢"
-    return f"{priority_emoji} 已向 **{recipient}** 发送通知：\n\n> {message}\n\n（模拟发送，实际部署时接入邮件服务）"
+async def send_notification(recipient: str, message: str, priority: str = "普通") -> str:
+    """发送邮件通知"""
+    import os
+    import smtplib
+    from email.mime.text import MIMEText
+    import asyncio
 
+    try:
+        smtp_host = os.getenv("SMTP_HOST", "smtp.qq.com")
+        smtp_user = os.getenv("SMTP_USER", "")
+        smtp_pass = os.getenv("SMTP_PASS", "")
+
+        if not smtp_user or not smtp_pass:
+            return f"邮件发送失败：SMTP 未配置"
+
+        msg = MIMEText(f"""您好，
+
+{message}
+
+---
+此邮件由 AI 办公助手自动发送
+收件人：{recipient}
+优先级：{priority}""", "plain", "utf-8")
+
+        msg["From"] = smtp_user
+        msg["To"] = smtp_user
+        msg["Subject"] = f"{'[紧急]' if priority == '紧急' else ''}通知：{recipient}"
+
+        # 用线程池执行同步 SMTP，不阻塞事件循环
+        def _send():
+            server = smtplib.SMTP_SSL(smtp_host, 465)
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+            server.quit()
+
+        await asyncio.get_event_loop().run_in_executor(None, _send)
+
+        return f"邮件已发送至 {recipient}：\n\n> {message}"
+    except ImportError:
+        return f"邮件发送失败：依赖缺失"
+    except Exception as e:
+        return f"邮件发送失败：{str(e)}"
 
 def search_knowledge(query: str) -> str:
     """模拟企业知识库搜索"""

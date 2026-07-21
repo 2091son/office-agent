@@ -9,6 +9,7 @@
 <body>
     <nav>
         <a href="/chat">AI 办公助手</a>
+         <a href="/admin" style="color:#ea4335;">管理面板</a>
         <span id="userInfo"></span>
         <a href="#" onclick="logout()">退出</a>
     </nav>

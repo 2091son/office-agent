@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理面板</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+  <nav>
+    <a href="/chat">AI 办公助手</a>
+    <a href="/admin" style="color:#ea4335;">管理面板</a>
+    <span style="margin-left:auto;color:#888;">管理员</span>
+    <a href="#" onclick="logout()">退出</a>
+  </nav>
+  <main>
+    <div class="result-container">
+      <h1>管理面板</h1>
+      <div id="loading">加载中...</div>
+      <div id="content" style="display:none;">
+        <h2 style="margin-top:24px;">工具使用统计</h2>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:24px;" id="statsTable">
+        </table>
+        <h2>最近操作记录</h2>
+        <table style="width:100%;border-collapse:collapse;" id="logsTable">
+        </table>
+      </div>
+    </div>
+  </main>
+  <script>
+    function logout() {
+      localStorage.removeItem('token');
+      window.location.href = '/';
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) { window.location.href = '/'; }
+
+    fetch('/api/admin', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
+      .then(r => {
+        if (!r.ok) { document.getElementById('loading').textContent = '无权限访问'; return; }
+        return r.json();
+      })
+      .then(data => {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+
+        // 统计表
+        let statsHtml = '<tr style="border-bottom:2px solid #e0e0e0;"><th style="text-align:left;padding:8px;">工具</th><th style="text-align:center;padding:8px;">调用次数</th></tr>';
+        data.stats.forEach(s => {
+          statsHtml += `<tr style="border-bottom:1px solid #f0f0f0;"><td style="padding:8px;">${s[0]}</td><td style="text-align:center;padding:8px;">${s[1]}</td></tr>`;
+        });
+        document.getElementById('statsTable').innerHTML = statsHtml;
+
+        // 操作记录表
+        let logsHtml = '<tr style="border-bottom:2px solid #e0e0e0;"><th style="text-align:left;padding:8px;">时间</th><th style="text-align:left;padding:8px;">用户</th><th style="text-align:left;padding:8px;">操作</th><th style="text-align:left;padding:8px;">详情</th></tr>';
+        data.logs.forEach(log => {
+          logsHtml += `<tr style="border-bottom:1px solid #f0f0f0;"><td style="padding:8px;">${log.time}</td><td style="padding:8px;">${log.user}</td><td style="padding:8px;">${log.action}</td><td style="padding:8px;">${log.detail || ''}</td></tr>`;
+        });
+        document.getElementById('logsTable').innerHTML = logsHtml;
+      });
+  </script>
+</body>
+
+</html>
