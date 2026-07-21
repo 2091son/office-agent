@@ -1,5 +1,5 @@
 import traceback, json
-from fastapi import FastAPI, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect, UploadFile, File, Form
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -35,7 +35,7 @@ LOGIN_HTML = """<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"><titl
 <p id="regErr" style="color:red;"></p>
 </div>
 <script>
-async function doLogin(){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('loginUser').value,password:document.getElementById('loginPass').value})});const d=await r.json();if(r.ok){localStorage.setItem('token',d.token);localStorage.setItem('role',d.role);window.location.href='/chat';}else document.getElementById('loginErr').textContent=d.detail;}
+async function doLogin(){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('loginUser').value,password:document.getElementById('loginPass').value})});const d=await r.json();if(r.ok){localStorage.setItem('token',d.token);localStorage.setItem('role',d.role);localStorage.setItem('userId',d.user_id);window.location.href='/chat';}else document.getElementById('loginErr').textContent=d.detail;}
 async function doReg(){const pw=document.getElementById('regPass').value;if(pw!==document.getElementById('regPass2').value){document.getElementById('regErr').textContent='Mismatch';return;}const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('regUser').value,password:pw})});const d=await r.json();if(r.ok){alert('Done');showLogin();}else document.getElementById('regErr').textContent=d.detail;}
 function showReg(){document.getElementById('loginBox').style.display='none';document.getElementById('regBox').style.display='block';}
 function showLogin(){document.getElementById('regBox').style.display='none';document.getElementById('loginBox').style.display='block';}
@@ -69,8 +69,7 @@ async def api_login(request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == data.get("username","").strip(), User.password == hash_password(data.get("password",""))).first()
     if not user: raise HTTPException(401, "Invalid")
     token = create_token(user.id, user.role)
-    return {"token": token, "role": user.role, "username": user.username}
-
+    return {"token": token, "role": user.role, "username": user.username, "user_id": user.id}
 @app.get("/chat", response_class=HTMLResponse)
 async def chat_page(request: Request):
     return templates.TemplateResponse(request=request, name="chat.html")
@@ -164,8 +163,24 @@ async def websocket_chat(websocket: WebSocket):
                 if conv_id:
                     db_log.add(Message(conversation_id=conv_id, role="user", content=msg))
                     db_log.add(Message(conversation_id=conv_id, role="assistant", content=ai_reply))
+                                # 工具名映射
+                name_map = {
+                    "generate_weekly_report": "生成周报",
+                    "summarize_meeting": "会议纪要",
+                    "process_excel": "数据处理",
+                    "send_notification": "发送通知",
+                    "search_knowledge": "搜索知识库",
+                    "search_contacts": "搜索通讯录",
+                }
                 for r in tool_results:
-                    log = OperationLog(user_id=user_id, action=r.split("]")[0].replace("[","") if "]" in r else "chat", detail=r[:200])
+                    raw_name = r.split("]")[0].replace("[","") if "]" in r else "chat"
+                    # 只保留结果内容，去掉原始前缀
+                    detail = r.split("]",1)[1].strip() if "]" in r else r[:200]
+                    log = OperationLog(
+                        user_id=user_id,
+                        action=name_map.get(raw_name, raw_name),
+                        detail=detail[:200]
+                    )
                     db_log.add(log)
                 db_log.commit(); db_log.close()
                 await websocket.send_text(json.dumps({"type":"reply","content":ai_reply,"tools":tool_results}))
@@ -182,9 +197,13 @@ async def list_users(current_user: User = Depends(require_admin), db: Session = 
 @app.delete("/api/admin/users/{uid}")
 async def delete_user(uid: int, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
     if uid == current_user.id: raise HTTPException(400, "Cannot delete yourself")
-    user = db.query(User).filter(User.id == uid).first()
-    if not user: raise HTTPException(404, "Not found")
-    db.delete(user); db.commit()
+    db.query(Message).filter(Message.conversation_id.in_(
+        db.query(Conversation.id).filter(Conversation.user_id == uid)
+    )).delete(synchronize_session=False)
+    db.query(Conversation).filter(Conversation.user_id == uid).delete(synchronize_session=False)
+    db.query(OperationLog).filter(OperationLog.user_id == uid).delete(synchronize_session=False)
+    db.query(User).filter(User.id == uid).delete(synchronize_session=False)
+    db.commit()
     return {"message": "Deleted"}
 
 @app.get("/api/conversations/{conv_id}/export")
@@ -209,6 +228,108 @@ async def list_documents(db: Session = Depends(get_db)):
     docs = db.query(Document).all()
     return [{"id": d.id, "title": d.title} for d in docs]
 
+@app.post("/api/documents/upload")
+async def upload_document(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    content = ""
+    filename = file.filename or "unknown"
+
+    if filename.endswith(".txt"):
+        content = (await file.read()).decode("utf-8", errors="ignore")
+    elif filename.endswith(".pdf"):
+        import io
+        from pypdf import PdfReader
+        data = await file.read()
+        reader = PdfReader(io.BytesIO(data))
+        for page in reader.pages:
+            content += page.extract_text() or ""
+    elif filename.endswith(".docx"):
+        import io
+        from docx import Document as DocxDoc
+        data = await file.read()
+        doc = DocxDoc(io.BytesIO(data))
+        content = "\n".join([p.text for p in doc.paragraphs])
+    elif filename.endswith(".xlsx"):
+        import io
+        from openpyxl import load_workbook
+        data = await file.read()
+        wb = load_workbook(io.BytesIO(data), data_only=True)
+        lines = []
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            lines.append(f"=== Sheet: {sheet_name} ===")
+            for row in ws.iter_rows(values_only=True):
+                line = " | ".join([str(c) if c is not None else "" for c in row])
+                lines.append(line)
+        content = "\n".join(lines)
+    else:
+        raise HTTPException(400, "Unsupported format. Use .txt, .pdf, .docx, or .xlsx")
+
+    if not content.strip():
+        raise HTTPException(400, "No text content found in file")
+
+    db2 = SessionLocal()
+    doc = Document(title=filename, content=content[:10000])
+    db2.add(doc); db2.commit()
+    doc_id = doc.id
+    db2.close()
+    return {"id": doc_id, "title": filename}
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+scheduler = AsyncIOScheduler()
+
+async def daily_reminder():
+    import os, smtplib, asyncio
+    from email.mime.text import MIMEText
+    try:
+        smtp_host = os.getenv("SMTP_HOST", "smtp.qq.com")
+        smtp_user = os.getenv("SMTP_USER", "")
+        smtp_pass = os.getenv("SMTP_PASS", "")
+        if not smtp_user: return False, "SMTP_USER not set"
+        if not smtp_pass: return False, "SMTP_PASS not set"
+
+        msg = MIMEText("Reminder: submit weekly report.", "plain", "utf-8")
+        msg["From"] = smtp_user
+        msg["To"] = smtp_user
+        msg["Subject"] = "Weekly Report Reminder"
+
+        def _send():
+            s = smtplib.SMTP_SSL(smtp_host, 465, timeout=10)
+            s.login(smtp_user, smtp_pass)
+            s.send_message(msg)
+            s.quit()
+        await asyncio.get_event_loop().run_in_executor(None, _send)
+        return True, "Sent to " + smtp_user
+    except Exception as e:
+        return False, str(e)
+
+@app.post("/api/reminder/test")
+async def test_reminder():
+    ok, msg = await daily_reminder()
+    return {"ok": ok, "message": msg}
+
+@app.delete("/api/documents/{doc_id}")
+async def delete_document(doc_id: int, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc: raise HTTPException(404, "Not found")
+    db.delete(doc); db.commit()
+    return {"message": "Deleted"}
+
+@app.put("/api/documents/{doc_id}")
+async def update_document(doc_id: int, request: Request, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    data = await request.json()
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc: raise HTTPException(404, "Not found")
+    doc.title = data.get("title", doc.title)
+    doc.content = data.get("content", doc.content)
+    db.commit()
+    return {"message": "Updated"}    
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend.main:app", host="127.0.0.1", port=5000, reload=True)
+    scheduler.add_job(daily_reminder, "cron", hour=23, minute=18)
+    scheduler.start()
+    uvicorn.run("backend.main:app", host="127.0.0.1", port=5000, reload=False)

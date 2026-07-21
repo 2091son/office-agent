@@ -4,94 +4,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel</title>
+    <title>管理面板</title>
     <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 </head>
 
 <body>
     <nav>
-        <a href="/chat">AI Office</a>
-        <a href="/admin" style="color:#ea4335;">Admin</a>
-        <span style="margin-left:auto;color:#888;">Admin</span>
-        <a href="#" onclick="logout()">Logout</a>
+        <a href="/chat">AI办公助手</a>
+        <a href="/admin" style="color:#ea4335;">管理面板</a>
+        <span style="margin-left:auto;color:#888;">管理员</span>
+        <a href="#" onclick="logout()">退出</a>
     </nav>
     <main>
         <div class="result-container">
-            <h1>Admin Panel</h1>
+            <h1>管理面板</h1>
 
-            <button class="btn-primary" style="margin-bottom:16px;" onclick="addContact()">+ Add Contact</button>
-            <h3>Contacts</h3>
-            <div id="contactsList" style="margin-bottom:24px;"></div>
+            <button class="btn-primary" onclick="addContact()">+ 添加联系人</button>
+            <button class="btn-primary" onclick="testReminder()">测试邮件提醒</button>
+            <h3>通讯录</h3>
+            <div id="contactsList"></div>
 
-            <h2>Tool Usage Stats</h2>
-            <table style="width:100%;border-collapse:collapse;margin-bottom:24px;" id="statsTable"></table>
+            <div id="chartDiv" style="width:100%;height:300px;"></div>
 
-            <h2>Documents</h2>
-            <button class="btn-primary" style="margin-bottom:8px;" onclick="addDoc()">+ Add Document</button>
-            <div id="docsList" style="margin-bottom:24px;"></div>
-            <h2>User Management</h2>
-            <table style="width:100%;border-collapse:collapse;margin-bottom:24px;" id="usersTable"></table>
-            <h2>Recent Logs</h2>
-            <table style="width:100%;border-collapse:collapse;" id="logsTable"></table>
+            <h2>工具使用统计</h2>
+            <table id="statsTable"></table>
+
+            <h2>知识库文档</h2>
+            <button class="btn-primary" onclick="addDoc()">+ 添加文档</button>
+            <input type="file" id="fileInput" accept=".txt,.pdf,.docx" style="display:none;" onchange="uploadFile()">
+            <button class="btn-primary" onclick="document.getElementById('fileInput').click()">上传文件</button>
+            <div id="docsList"></div>
+
+            <h2>用户管理</h2>
+            <table id="usersTable"></table>
+
+            <h2>操作日志</h2>
+            <table id="logsTable"></table>
         </div>
     </main>
     <script>
         const token = localStorage.getItem('token');
+        const currentUserId = parseInt(localStorage.getItem('userId') || '0');
         if (!token) { window.location.href = '/'; }
 
         function addContact() {
-            const name = prompt('Name'); if (!name) return;
-            const email = prompt('Email'); if (!email || !email.includes('@')) { alert('Invalid email'); return; } const dept = prompt('Department') || '';
+            const name = prompt('姓名'); if (!name) return;
+            const email = prompt('邮箱'); if (!email || !email.includes('@')) { alert('邮箱格式错误'); return; }
+            const dept = prompt('部门') || '';
             fetch('/api/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ name, email, department: dept }) }).then(() => location.reload());
         }
 
-        function loadContacts() {
-            fetch('/api/contacts', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(data => {
-                document.getElementById('contactsList').innerHTML = data.map(c => '<div style="padding:4px 0;">' + c.name + ' - ' + c.email + ' (' + c.department + ')</div>').join('');
-            });
+        function testReminder() {
+            fetch('/api/reminder/test', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(d => alert(d.message));
         }
-
-        fetch('/api/admin/users', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(users => {
-            document.getElementById('usersTable').innerHTML = '<tr><th>ID</th><th>Username</th><th>Role</th><th>Created</th><th>Actions</th></tr>'
-                + users.map(u => '<tr><td>' + u.id + '</td><td>' + u.username + '</td><td>' + u.role + '</td><td>' + u.created_at + '</td><td>' + (u.role !== 'admin' ? '<button onclick="promote(' + u.id + ')">Promote</button> ' : '') + '<button onclick="delUser(' + u.id + ')">Delete</button></td></tr>').join('');
-        });
 
         function addDoc() {
-            const title = prompt('Title'); if (!title) return;
-            const content = prompt('Content (paste text)'); if (!content) return;
+            const title = prompt('标题'); if (!title) return;
+            const content = prompt('内容（粘贴文本）'); if (!content) return;
             fetch('/api/documents', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ title, content }) }).then(() => location.reload());
         }
-        fetch('/api/documents', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(docs => {
-            document.getElementById('docsList').innerHTML = docs.map(d => '<div style="padding:2px 0;">' + d.title + ' (#' + d.id + ')</div>').join('');
-        });
-        function promote(uid) { fetch('/api/admin/promote', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ user_id: uid }) }).then(() => location.reload()); }
-        function delUser(uid) { if (confirm('Delete user ' + uid + '?')) { fetch('/api/admin/users/' + uid, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } }).then(() => location.reload()); } }
-        fetch('/api/admin', { headers: { 'Authorization': 'Bearer ' + token } })
-            .then(r => { if (!r.ok) { document.body.innerHTML = 'No permission'; return; } return r.json(); })
-            .then(data => {
-                let statsHtml = '<tr><th style="text-align:left;padding:8px;">Tool</th><th style="text-align:center;padding:8px;">Count</th></tr>';
-                if (data.stats) data.stats.forEach(s => {
-                    statsHtml += '<tr><td style="padding:8px;">' + s[0] + '</td><td style="text-align:center;padding:8px;">' + s[1] + '</td></tr>';
-                });
-                document.getElementById('statsTable').innerHTML = statsHtml;
 
-                let logsHtml = '<tr><th>Time</th><th>User</th><th>Action</th><th>Detail</th></tr>';
-                if (data.logs) data.logs.forEach(log => {
-                    logsHtml += '<tr><td>' + log.time + '</td><td>' + log.user + '</td><td>' + log.action + '</td><td>' + (log.detail || '') + '</td></tr>';
-                });
-                document.getElementById('logsTable').innerHTML = logsHtml;
+        async function uploadFile() {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) return;
+            const form = new FormData(); form.append('file', file);
+            const r = await fetch('/api/documents/upload', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: form });
+            if (r.ok) { location.reload(); } else { alert('上传失败'); }
+        }
+        function promote(uid) { if (!confirm('确定将该用户升级为管理员？')) return; fetch('/api/admin/promote', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ user_id: uid }) }).then(() => location.reload()); }
+        function delUser(uid) { if (confirm('确定删除用户 ' + uid + '?')) { fetch('/api/admin/users/' + uid, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } }).then(() => location.reload()); } }
+
+        fetch('/api/contacts', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(data => {
+            document.getElementById('contactsList').innerHTML = '<div>' + data.map(c => c.name + ' - ' + c.email + ' (' + c.department + ')').join(' | ') + '</div>';
+        });
+
+        fetch('/api/admin/users', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(users => {
+            document.getElementById('usersTable').innerHTML = '<tr><th>ID</th><th>用户名</th><th>角色</th><th>注册时间</th><th>操作</th></tr>'
+                + users.map(u => '<tr><td>' + u.id + '</td><td>' + u.username + '</td><td>' + u.role + '</td><td>' + u.created_at + '</td><td>' + (u.role !== 'admin' ? '<button onclick="promote(' + u.id + ')">升级</button> ' : '') + (u.role !== 'admin' ? '<button onclick="delUser(' + u.id + ')">删除</button>' : '')).join('');
+        });
+
+        fetch('/api/documents', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(docs => {
+            document.getElementById('docsList').innerHTML = docs.map(d => '<div>' + d.title + ' (#' + d.id + ') <button onclick="editDoc(' + d.id + ',\'' + d.title + '\')">编辑</button> <button onclick="delDoc(' + d.id + ')">删除</button></div>').join('');
+        });
+
+        fetch('/api/admin', { headers: { 'Authorization': 'Bearer ' + token } })
+            .then(r => { if (!r.ok) { document.body.innerHTML = '无权限访问'; return; } return r.json(); })
+            .then(data => {
+                document.getElementById('statsTable').innerHTML = '<tr><th>工具</th><th>次数</th></tr>' + (data.stats ? data.stats.map(s => '<tr><td>' + s[0] + '</td><td>' + s[1] + '</td></tr>').join('') : '');
+                document.getElementById('logsTable').innerHTML = '<tr><th>时间</th><th>用户</th><th>操作</th><th>详情</th></tr>' + (data.logs ? data.logs.map(l => '<tr><td>' + l.time + '</td><td>' + l.user + '</td><td>' + l.action + '</td><td>' + (l.detail || '') + '</td></tr>').join('') : '');
             });
-        loadContacts();
+
+        const chart = echarts.init(document.getElementById('chartDiv'));
+        fetch('/api/admin', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(data => {
+            if (!data.stats || data.stats.length === 0) return;
+            chart.setOption({
+                title: { text: '工具使用次数', left: 'center' },
+                xAxis: { type: 'category', data: data.stats.map(s => s[0]) },
+                yAxis: { type: 'value' },
+                series: [{ type: 'bar', data: data.stats.map(s => s[1]), itemStyle: { color: '#1a73e8' } }]
+            });
+        });
 
         function logout() { localStorage.removeItem('token'); window.location.href = '/'; }
-        function makeAdmin() {
-            const uid = prompt('输入要升级的用户ID');
-            if (!uid) return;
-            fetch('/api/admin/promote', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-                body: JSON.stringify({ user_id: parseInt(uid) })
-            }).then(r => r.json()).then(d => alert(d.message || 'Done'));
+        function editDoc(id, oldTitle) {
+            const title = prompt('标题', oldTitle); if (!title) return;
+            const content = prompt('内容（粘贴文本）');
+            if (content === null) return;
+            fetch('/api/documents/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ title, content: content || undefined }) }).then(() => location.reload());
+        }
+        function delDoc(id) {
+            if (!confirm('确定删除文档 #' + id + '?')) return;
+            fetch('/api/documents/' + id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } }).then(() => location.reload());
         }
     </script>
 </body>

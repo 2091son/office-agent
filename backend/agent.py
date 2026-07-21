@@ -1,7 +1,7 @@
 import json
 import httpx
 from backend.config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL
-from backend.tools import TOOLS_SCHEMA, generate_weekly_report, summarize_meeting, process_excel, send_notification, search_knowledge, search_contacts
+from backend.tools import TOOLS_SCHEMA, generate_weekly_report, summarize_meeting, process_excel, send_notification, search_knowledge, search_contacts, export_filtered_excel
 
 SYSTEM_PROMPT = """You are an enterprise office automation AI assistant. Your job is to help employees efficiently complete office tasks.
 
@@ -9,15 +9,21 @@ You can use the following tools:
 - generate_weekly_report: Generate formatted weekly reports
 - summarize_meeting: Organize meeting notes into structured minutes
 - process_excel: Process Excel data (sum, average, filter, sort)
+- process_excel: Process Excel data — raw numbers or uploaded .xlsx files by document_id, with column-based sum/average/filter/sort/top/count
+ - process_excel: Process Excel data — sum/average/filter/sort on uploaded files or raw numbers
+ - export_filtered_excel: Filter an uploaded Excel and export matching rows as a new downloadable .xlsx file
 - send_notification: Send email notifications
+ - send_notification: Send notifications via DingTalk or email
 - search_knowledge: Search internal knowledge base
+ - search_knowledge: Search internal knowledge base — returns documents with IDs. Use the most relevant document's ID for process_excel.
 - search_contacts: Search company contacts by name
 
 Rules:
 1. When a user asks for an office task, determine which tools to call
 2. If no tools are needed, respond directly
 3. After calling tools, integrate results into a clear, professional reply
-4. If multiple tasks are requested, complete them in sequence"""
+4. If multiple tasks are requested, complete them in sequence
+5. Keep responses concise and direct. No bullet points or numbered lists unless asked."""
 
 
 async def call_deepseek(messages: list):
@@ -67,6 +73,7 @@ async def execute_tool(tool_name: str, arguments: dict) -> str:
         "send_notification": send_notification,
         "search_knowledge": search_knowledge,
         "search_contacts": search_contacts,
+        "export_filtered_excel": export_filtered_excel,
     }
 
     func = tools_map.get(tool_name)
