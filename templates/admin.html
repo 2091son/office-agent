@@ -1,45 +1,72 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>管理面板</title>
     <link rel="stylesheet" href="/static/style.css">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <style>
+        .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        .card { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .card h2 { font-size: 15px; margin-bottom: 10px; color: #333; }
+        .card table { width: 100%; border-collapse: collapse; }
+        .card th, .card td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+        .card th { color: #888; font-weight: 500; }
+        .card td { color: #444; }
+        .full-width { grid-column: 1 / -1; }
+        .actions { display: flex; gap: 8px; margin-bottom: 16px; }
+        .actions button { width: auto; padding: 8px 16px; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+        .badge-admin { background: #e8f0fe; color: #1a73e8; }
+        .badge-user { background: #f0f0f0; color: #666; }
+        .action-btn { padding: 3px 10px; border: 1px solid #ddd; border-radius: 4px; background: #fff; cursor: pointer; font-size: 12px; margin: 0 2px; }
+        .action-btn.danger { color: #ea4335; border-color: #fce8e6; }
+        .action-btn:hover { background: #f5f5f5; }
+        .contact-row { display: flex; align-items:center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size:13px; }
+        .contact-row:last-child { border-bottom: none; }
+    </style>
 </head>
-
 <body>
     <nav>
-        <a href="/chat">AI办公助手</a>
+        <a href="/chat">AI 办公助手</a>
         <a href="/admin" style="color:#ea4335;">管理面板</a>
         <span style="margin-left:auto;color:#888;">管理员</span>
         <a href="#" onclick="logout()">退出</a>
     </nav>
     <main>
-        <div class="result-container">
-            <h1>管理面板</h1>
-
+        <div class="actions">
             <button class="btn-primary" onclick="addContact()">+ 添加联系人</button>
-            <button class="btn-primary" onclick="testReminder()">测试邮件提醒</button>
-            <h3>通讯录</h3>
-            <div id="contactsList"></div>
+            <button class="btn-primary" style="background:#34a853;" onclick="testReminder()">测试邮件提醒</button>
+        </div>
 
-            <div id="chartDiv" style="width:100%;height:300px;"></div>
+        <div class="admin-grid">
+            <div class="card">
+                <h2>工具使用统计</h2>
+                <table id="statsTable"></table>
+            </div>
+            <div class="card">
+                <h2>通讯录</h2>
+                <div id="contactsList"></div>
+            </div>
+        </div>
 
-            <h2>工具使用统计</h2>
-            <table id="statsTable"></table>
+        <div class="card" style="margin-bottom:16px;">
+            <div id="chartDiv" style="width:100%;height:260px;"></div>
+        </div>
 
+        <div class="card" style="margin-bottom:16px;">
             <h2>用户管理</h2>
             <table id="usersTable"></table>
+        </div>
 
+        <div class="card">
             <h2>操作日志</h2>
             <table id="logsTable"></table>
         </div>
     </main>
     <script>
         const token = localStorage.getItem('token');
-        const currentUserId = parseInt(localStorage.getItem('userId') || '0');
         if (!token) { window.location.href = '/'; }
 
         function addContact() {
@@ -57,12 +84,14 @@
         function delUser(uid) { if (confirm('确定删除用户 ' + uid + '?')) { fetch('/api/admin/users/' + uid, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } }).then(() => location.reload()); } }
 
         fetch('/api/contacts', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(data => {
-            document.getElementById('contactsList').innerHTML = '<div>' + data.map(c => c.name + ' - ' + c.email + ' (' + c.department + ')').join(' | ') + '</div>';
+            document.getElementById('contactsList').innerHTML = data.map(c =>
+                '<div class="contact-row"><span>' + c.name + ' <span style="color:#888;">' + c.email + '</span></span><span style="color:#888;">' + (c.department || '-') + '</span></div>'
+            ).join('');
         });
 
         fetch('/api/admin/users', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(users => {
             document.getElementById('usersTable').innerHTML = '<tr><th>ID</th><th>用户名</th><th>角色</th><th>注册时间</th><th>操作</th></tr>'
-                + users.map(u => '<tr><td>' + u.id + '</td><td>' + u.username + '</td><td>' + u.role + '</td><td>' + u.created_at + '</td><td>' + (u.role !== 'admin' ? '<button onclick="promote(' + u.id + ')">升级</button> ' : '') + (u.role !== 'admin' ? '<button onclick="delUser(' + u.id + ')">删除</button>' : '')).join('');
+                + users.map(u => '<tr><td>' + u.id + '</td><td>' + u.username + '</td><td><span class="badge ' + (u.role === 'admin' ? 'badge-admin' : 'badge-user') + '">' + u.role + '</span></td><td>' + u.created_at + '</td><td>' + (u.role !== 'admin' ? '<button class="action-btn" onclick="promote(' + u.id + ')">升级</button><button class="action-btn danger" onclick="delUser(' + u.id + ')">删除</button>' : '<span style="color:#999;">-</span>') + '</td></tr>').join('');
         });
 
         fetch('/api/admin', { headers: { 'Authorization': 'Bearer ' + token } })
@@ -76,15 +105,15 @@
         fetch('/api/admin', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(data => {
             if (!data.stats || data.stats.length === 0) return;
             chart.setOption({
-                title: { text: '工具使用次数', left: 'center' },
+                title: { text: '工具使用次数', left: 'center', textStyle: { fontSize: 14 } },
                 xAxis: { type: 'category', data: data.stats.map(s => s[0]) },
                 yAxis: { type: 'value' },
-                series: [{ type: 'bar', data: data.stats.map(s => s[1]), itemStyle: { color: '#1a73e8' } }]
+                series: [{ type: 'bar', data: data.stats.map(s => s[1]), itemStyle: { color: '#1a73e8', borderRadius: [4,4,0,0] } }],
+                grid: { top: 30, bottom: 20, left: 40, right: 20 }
             });
         });
 
         function logout() { localStorage.removeItem('token'); window.location.href = '/'; }
     </script>
 </body>
-
 </html>

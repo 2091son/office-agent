@@ -5,7 +5,7 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "generate_weekly_report",
-            "description": "Generate a formatted weekly report based on user's work description",
+            "description": "Generate a detailed weekly report. Take the user's brief work notes and expand them into a full professional report with: project name, specific tasks completed, key results, challenges encountered, and next week's plan.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -60,7 +60,8 @@ TOOLS_SCHEMA = [
                 "properties": {
                     "recipient": {"type": "string", "description": "Recipient name or email"},
                     "message": {"type": "string", "description": "Notification content"},
-                    "priority": {"type": "string", "enum": ["normal", "urgent"], "description": "Priority level"}
+                    "priority": {"type": "string", "enum": ["normal", "urgent"], "description": "Priority level"},
+                    "channel": {"type": "string", "enum": ["email", "dingtalk"], "description": "Send via email (for individuals in contacts) or DingTalk (for group notifications). If not specified, email is used for known contacts, dingtalk for unknown recipients."}
                 },
                 "required": ["recipient", "message"]
             }
@@ -274,15 +275,83 @@ def process_excel(action: str, data_description: str, numbers: str = "",
         return f"{action.capitalize()} on {data_description}: {nums}"
 
 
-async def send_notification(recipient: str, message: str, priority: str = "normal") -> str:
+async def send_notification(recipient: str, message: str, priority: str = "normal", channel: str = None) -> str:
     import os, smtplib, asyncio, httpx
     from email.mime.text import MIMEText
 
+    # Step 0: If recipient looks like an email, send directly
+    if "@" in recipient:
+        contact_email = recipient
+    else:
+        contact_email = None
+
+    if contact_email:
+        try:
+            smtp_host = os.getenv("SMTP_HOST", "smtp.qq.com")
+            smtp_user = os.getenv("SMTP_USER", "")
+            smtp_pass = os.getenv("SMTP_PASS", "")
+            if not smtp_user or not smtp_pass:
+                return f"SMTP not configured"
+
+            msg = MIMEText(f"Hello,\n\n{message}\n\n---\nAI Office Agent\nTo: {recipient}\nPriority: {priority}", "plain", "utf-8")
+            msg["From"] = smtp_user
+            msg["To"] = contact_email
+            msg["Subject"] = f"{'[URGENT] ' if priority == 'urgent' else ''}Notification: {recipient}"
+
+            def _send():
+                server = smtplib.SMTP_SSL(smtp_host, 465, timeout=10)
+                server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+                server.quit()
+
+            await asyncio.get_event_loop().run_in_executor(None, _send)
+            return f"Email sent to {recipient}: {message}"
+        except Exception as e:
+            return f"Email failed: {str(e)}"
+
+    # Step 1: Look up recipient in contacts
     try:
-        # 优先钉钉
-        dingtalk_url = os.getenv("DINGTALK_WEBHOOK", "")
-        if dingtalk_url:
-            try:
+        from backend.database import SessionLocal
+        db = SessionLocal()
+        rows = db.execute("SELECT name, email FROM contacts WHERE name LIKE ?", (f"%{recipient}%",)).fetchall()
+        db.close()
+        for name, email in rows:
+            if name in recipient or recipient in name:
+                contact_email = email
+                break
+    except:
+        pass
+
+    # Step 2: If found in contacts, send email directly to them
+    if contact_email:
+        try:
+            smtp_host = os.getenv("SMTP_HOST", "smtp.qq.com")
+            smtp_user = os.getenv("SMTP_USER", "")
+            smtp_pass = os.getenv("SMTP_PASS", "")
+            if not smtp_user or not smtp_pass:
+                return f"SMTP not configured"
+
+            msg = MIMEText(f"Hello,\n\n{message}\n\n---\nAI Office Agent\nTo: {recipient}\nPriority: {priority}", "plain", "utf-8")
+            msg["From"] = smtp_user
+            msg["To"] = contact_email
+            msg["Subject"] = f"{'[URGENT] ' if priority == 'urgent' else ''}Notification: {recipient}"
+
+            def _send():
+                server = smtplib.SMTP_SSL(smtp_host, 465, timeout=10)
+                server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+                server.quit()
+
+            await asyncio.get_event_loop().run_in_executor(None, _send)
+            return f"Email sent to {recipient} ({contact_email}): {message}"
+        except Exception as e:
+            return f"Email failed: {str(e)}"
+
+    # Step 3: Not in contacts — suggest alternatives
+    if channel == "dingtalk":
+        try:
+            dingtalk_url = os.getenv("DINGTALK_WEBHOOK", "")
+            if dingtalk_url:
                 async with httpx.AsyncClient() as client:
                     r = await client.post(dingtalk_url, json={
                         "msgtype": "text",
@@ -290,41 +359,12 @@ async def send_notification(recipient: str, message: str, priority: str = "norma
                     })
                 if r.status_code == 200:
                     return f"钉钉通知已发送至 {recipient}：{message}"
-            except:
-                pass
-        from backend.database import SessionLocal
-        db = SessionLocal()
-        rows = db.execute("SELECT name, email FROM contacts WHERE name LIKE ?", (f"%{recipient}%",)).fetchall()
-        db.close()
-        for name, email in rows:
-            if name in recipient:
-                recipient = email
-                break
-    except:
-        pass
+                return f"钉钉发送失败：{r.text}"
+            return "钉钉 Webhook 未配置"
+        except Exception as e:
+            return f"钉钉发送失败：{str(e)}"
+    return f"未找到联系人 '{recipient}'。如需发钉钉群通知，请说明'发钉钉'。"
 
-    try:
-        smtp_host = os.getenv("SMTP_HOST", "smtp.qq.com")
-        smtp_user = os.getenv("SMTP_USER", "")
-        smtp_pass = os.getenv("SMTP_PASS", "")
-        if not smtp_user or not smtp_pass:
-            return f"SMTP not configured"
-
-        msg = MIMEText(f"Hello,\n\n{message}\n\n---\nAI Office Agent\nTo: {recipient}\nPriority: {priority}", "plain", "utf-8")
-        msg["From"] = smtp_user
-        msg["To"] = smtp_user
-        msg["Subject"] = f"{'[URGENT] ' if priority == 'urgent' else ''}Notification: {recipient}"
-
-        def _send():
-            server = smtplib.SMTP_SSL(smtp_host, 465, timeout=10)
-            server.login(smtp_user, smtp_pass)
-            server.send_message(msg)
-            server.quit()
-
-        await asyncio.get_event_loop().run_in_executor(None, _send)
-        return f"Email sent to {recipient}: {message}"
-    except Exception as e:
-        return f"Email failed: {str(e)}"
 
 
 def search_knowledge(query: str) -> str:

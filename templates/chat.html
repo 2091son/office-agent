@@ -14,7 +14,7 @@
 
         .sidebar {
             width: 240px;
-            background: #fafafa;
+            background: #fff;
             border-right: 1px solid #e0e0e0;
             overflow-y: auto;
             padding: 12px;
@@ -66,8 +66,10 @@
 <body>
     <nav>
         <a href="/chat">AI 办公助手</a>
-        <span style="margin-left:auto;color:#888;" id="userInfo"></span>
-        <a href="#" onclick="logout()">退出</a>
+        <div class="nav-right">
+            <span id="userInfo"></span>
+            <a href="#" onclick="logout()">退出</a>
+        </div>
     </nav>
     <div class="layout">
         <div class="sidebar">
@@ -77,8 +79,7 @@
         </div>
         <div class="chat-area">
             <div class="chat-header">
-                <button onclick="exportConv()"
-                    style="float:right;background:none;border:1px solid #ccc;padding:4px 12px;border-radius:4px;cursor:pointer;">Export</button>
+                <button onclick="exportConv()" style="float:right;background:none;border:1px solid #ddd;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;color:#888;">导出</button>
                 <h2>AI 办公助手</h2>
                 <p>生成周报 · 整理会议纪要 · 处理表格 · 发送通知 · 搜索知识库</p>
             </div>
@@ -98,7 +99,8 @@
         if (!token) window.location.href = '/';
         const role = localStorage.getItem('role');
         if (role === 'admin') {
-            document.querySelector('nav').innerHTML += '<a href="/admin" style="color:#ea4335;">管理面板</a>';
+            const navRight = document.querySelector('.nav-right');
+            navRight.innerHTML = '<a href="/admin">管理面板</a>' + navRight.innerHTML;
         }
         let currentConvId = null;
         const ws = new WebSocket(`ws://${location.host}/ws/chat?token=${token}`);
@@ -134,7 +136,7 @@
             if (!currentConvId) {
                 fetch('/api/conversations', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
                     body: JSON.stringify({ title: msg.substring(0, 30), user_id: 1 })
                 }).then(r => r.json()).then(d => {
                     currentConvId = d.id;
@@ -157,7 +159,7 @@
         function loadConversation(convId) {
             currentConvId = convId;
             document.getElementById('chatMessages').innerHTML = '';
-            fetch('/api/conversations/' + convId)
+            fetch('/api/conversations/' + convId, { headers: { 'Authorization': 'Bearer ' + token } })
                 .then(r => r.json())
                 .then(msgs => {
                     msgs.forEach(m => addMessage(m.role, m.content));
@@ -188,13 +190,13 @@
 
         loadConversations();
         function exportConv() {
-            if (!currentConvId) { alert('No conversation selected'); return; }
-            fetch('/api/conversations/' + currentConvId + '/export')
+            if (!currentConvId) { alert('请先选择一个对话'); return; }
+            fetch('/api/conversations/' + currentConvId + '/export', { headers: { 'Authorization': 'Bearer ' + token } })
                 .then(r => r.json()).then(d => {
                     const blob = new Blob([d.text], { type: 'text/plain' });
                     const a = document.createElement('a');
                     a.href = URL.createObjectURL(blob);
-                    a.download = 'conversation.txt';
+                    a.download = '对话记录_' + new Date().toISOString().slice(0,10) + '.txt';
                     a.click();
                 });
         }

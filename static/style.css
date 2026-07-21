@@ -6,28 +6,48 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
-  background: #e8e8f8;
+  background: #f5f5f5;
   color: #333;
   min-height: 100vh;
 }
 
 nav {
   background: #fff;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 12px 24px;
+  border-bottom: 1px solid #eee;
+  padding: 0 24px;
+  height: 52px;
   display: flex;
-  gap: 16px;
+  gap: 0;
   align-items: center;
 }
 
 nav a {
   text-decoration: none;
-  color: #1a73e8;
+  color: #555;
   font-size: 14px;
+  padding: 16px 12px;
+  transition: color 0.2s;
+}
+
+nav a:first-child {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  padding-left: 0;
 }
 
 nav a:hover {
-  text-decoration: underline;
+  color: #1a73e8;
+  text-decoration: none;
+}
+
+.nav-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #888;
 }
 
 #userInfo {
@@ -121,7 +141,7 @@ main {
 }
 
 .message.user {
-  background: #d8d8f0;
+  background: #e8f0fe;
   align-self: flex-end;
 }
 

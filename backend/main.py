@@ -221,9 +221,11 @@ async def delete_user(uid: int, current_user: User = Depends(require_admin), db:
     return {"message": "Deleted"}
 
 @app.get("/api/conversations/{conv_id}/export")
-async def export_conversation(conv_id: int, db: Session = Depends(get_db)):
+async def export_conversation(conv_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     msgs = db.query(Message).filter(Message.conversation_id == conv_id).order_by(Message.created_at).all()
     conv = db.query(Conversation).filter(Conversation.id == conv_id).first()
+    if not conv or conv.user_id != current_user.id:
+        return {"text": "无权限或对话不存在"}
     text = f"Conversation: {conv.title if conv else 'Unknown'}\n{'='*40}\n\n"
     for m in msgs:
         role = "User" if m.role == "user" else "AI"
