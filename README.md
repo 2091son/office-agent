@@ -79,3 +79,7 @@ python -m uvicorn backend.main:app --host 127.0.0.1 --port 5000 --reload
 3. **为什么升级到 SQLAlchemy ORM**：工具链复杂之后，ORM 的事务管理和模型关联比裸 SQL 清晰得多。operation_logs 表记录所有用户操作——这是企业项目的基本要求。
 
 4. **WebSocket 和 HTTP 的区别**：聊天场景需要持续双向通信，HTTP 每次重新建立连接效率太低。WebSocket 一次连接持续保持，消息实时推送。
+
+## 页面展示
+![聊天](static/screenshot1.png)
+![管理面板](static/screenshot2.png)

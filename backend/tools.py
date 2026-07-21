@@ -1,22 +1,16 @@
-"""办公工具集：每个工具函数 + Function Calling 所需的 JSON Schema"""
+"""Office tools: functions + JSON Schema for Function Calling"""
 
 TOOLS_SCHEMA = [
     {
         "type": "function",
         "function": {
             "name": "generate_weekly_report",
-            "description": "根据用户描述的内容，生成一份格式化的周报",
+            "description": "Generate a formatted weekly report based on user's work description",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "content": {
-                        "type": "string",
-                        "description": "本周的工作内容，可以是零散的描述"
-                    },
-                    "week_range": {
-                        "type": "string",
-                        "description": "例如'7月14日-7月18日'"
-                    }
+                    "content": {"type": "string", "description": "Work content for the week"},
+                    "week_range": {"type": "string", "description": "e.g. 'July 14-July 18'"}
                 },
                 "required": ["content"]
             }
@@ -26,14 +20,11 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "summarize_meeting",
-            "description": "将会议笔记整理成结构化的会议纪要，提取议题、决议、待办事项",
+            "description": "Organize meeting notes into structured minutes with action items",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "notes": {
-                        "type": "string",
-                        "description": "原始的会议笔记或录音文字"
-                    }
+                    "notes": {"type": "string", "description": "Raw meeting notes"}
                 },
                 "required": ["notes"]
             }
@@ -43,23 +34,13 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "process_excel",
-            "description": "对 Excel 数据执行操作：统计、筛选、排序等",
+            "description": "Process Excel data: sum, average, filter, sort",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "action": {
-                        "type": "string",
-                        "description": "要执行的操作，例如：统计总数、按某列排序、筛选大于某值的行",
-                        "enum": ["统计总数", "计算平均值", "筛选数据", "排序"]
-                    },
-                    "data_description": {
-                        "type": "string",
-                        "description": "对数据的描述，例如'销售数据，列有：月份、销售额、利润'"
-                    },
-                    "numbers": {
-                        "type": "string",
-                        "description": "实际数据，例如'100,200,300,400,500'"
-                    }
+                    "action": {"type": "string", "enum": ["sum", "average", "filter", "sort"], "description": "Operation to perform"},
+                    "data_description": {"type": "string", "description": "Description of the data"},
+                    "numbers": {"type": "string", "description": "Comma-separated numbers, e.g. '100,200,300'"}
                 },
                 "required": ["action", "data_description"]
             }
@@ -69,23 +50,13 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "send_notification",
-            "description": "向指定人员发送通知或提醒",
+            "description": "Send email notification to a person or department",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "recipient": {
-                        "type": "string",
-                        "description": "接收人姓名或部门"
-                    },
-                    "message": {
-                        "type": "string",
-                        "description": "通知内容"
-                    },
-                    "priority": {
-                        "type": "string",
-                        "enum": ["普通", "紧急"],
-                        "description": "优先级"
-                    }
+                    "recipient": {"type": "string", "description": "Recipient name or email"},
+                    "message": {"type": "string", "description": "Notification content"},
+                    "priority": {"type": "string", "enum": ["normal", "urgent"], "description": "Priority level"}
                 },
                 "required": ["recipient", "message"]
             }
@@ -95,119 +66,137 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "search_knowledge",
-            "description": "搜索企业内部知识库或数据",
+            "description": "Search internal knowledge base for policies and procedures",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "要搜索的关键词或问题"
-                    }
+                    "query": {"type": "string", "description": "Search query"}
                 },
                 "required": ["query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_contacts",
+            "description": "Search the company contact list by name to find email and department",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Name to search for"}
+                },
+                "required": ["name"]
             }
         }
     }
 ]
 
 
-def generate_weekly_report(content: str, week_range: str = "本周") -> str:
-    """生成格式化周报"""
-    return f"""## 周报（{week_range}）
+def generate_weekly_report(content: str, week_range: str = "This week") -> str:
+    return f"""## Weekly Report ({week_range})
 
-### 本周工作内容
+### Work Completed
 {content}
 
-### 下周计划
-（请根据实际情况补充）
+### Next Week Plan
+(Please add as needed)
 
 ---
-*由 AI 办公助手自动生成*"""
+*Generated by AI Office Agent*"""
 
 
 def summarize_meeting(notes: str) -> str:
-    """整理会议纪要（核心逻辑由 AI prompt 处理，这里做格式化包装）"""
-    return f"""## 📋 会议纪要
+    return f"""## Meeting Minutes
 
-### 原始笔记
+### Raw Notes
 {notes}
 
 ---
-*请 AI 提取以下信息：参会人、议题、决议、待办事项*"""
+*Extract: attendees, topics, decisions, action items*"""
 
 
 def process_excel(action: str, data_description: str, numbers: str = "") -> str:
-    """处理 Excel 数据"""
     if not numbers:
-        return f"操作：{action}\n数据描述：{data_description}\n结果：请提供具体数据以进行计算。"
-
+        return f"Action: {action}\nData: {data_description}\nResult: Please provide numbers."
     nums = [float(n.strip()) for n in numbers.split(",") if n.strip()]
     if not nums:
-        return f"操作：{action}\n数据描述：{data_description}\n结果：未能解析到有效数字。"
-
-    if action == "统计总数":
-        total = sum(nums)
-        return f"操作：统计总数\n数据描述：{data_description}\n结果：总计 = {total}"
-    elif action == "计算平均值":
-        avg = sum(nums) / len(nums)
-        return f"操作：计算平均值\n数据描述：{data_description}\n结果：平均值 = {avg:.2f}"
+        return f"Action: {action}\nData: {data_description}\nResult: No valid numbers."
+    if action == "sum":
+        return f"Sum of {data_description}: {sum(nums)}"
+    elif action == "average":
+        return f"Average of {data_description}: {sum(nums)/len(nums):.2f}"
+    elif action == "sort":
+        return f"Sorted {data_description}: {sorted(nums)}"
     else:
-        sorted_nums = sorted(nums)
-        return f"操作：{action}\n数据描述：{data_description}\n结果：处理后的数据 = {sorted_nums}"
+        return f"Action: {action} on {data_description}: {nums}"
 
 
-async def send_notification(recipient: str, message: str, priority: str = "普通") -> str:
-    """发送邮件通知"""
-    import os
-    import smtplib
+async def send_notification(recipient: str, message: str, priority: str = "normal") -> str:
+    import os, smtplib, asyncio
     from email.mime.text import MIMEText
-    import asyncio
+
+    try:
+        from backend.database import SessionLocal
+        db = SessionLocal()
+        rows = db.execute("SELECT name, email FROM contacts WHERE name LIKE ?", (f"%{recipient}%",)).fetchall()
+        db.close()
+        for name, email in rows:
+            if name in recipient:
+                recipient = email
+                break
+    except:
+        pass
 
     try:
         smtp_host = os.getenv("SMTP_HOST", "smtp.qq.com")
         smtp_user = os.getenv("SMTP_USER", "")
         smtp_pass = os.getenv("SMTP_PASS", "")
-
         if not smtp_user or not smtp_pass:
-            return f"邮件发送失败：SMTP 未配置"
+            return f"SMTP not configured"
 
-        msg = MIMEText(f"""您好，
-
-{message}
-
----
-此邮件由 AI 办公助手自动发送
-收件人：{recipient}
-优先级：{priority}""", "plain", "utf-8")
-
+        msg = MIMEText(f"Hello,\n\n{message}\n\n---\nAI Office Agent\nTo: {recipient}\nPriority: {priority}", "plain", "utf-8")
         msg["From"] = smtp_user
         msg["To"] = smtp_user
-        msg["Subject"] = f"{'[紧急]' if priority == '紧急' else ''}通知：{recipient}"
+        msg["Subject"] = f"{'[URGENT] ' if priority == 'urgent' else ''}Notification: {recipient}"
 
-        # 用线程池执行同步 SMTP，不阻塞事件循环
         def _send():
-            server = smtplib.SMTP_SSL(smtp_host, 465)
+            server = smtplib.SMTP_SSL(smtp_host, 465, timeout=10)
             server.login(smtp_user, smtp_pass)
             server.send_message(msg)
             server.quit()
 
         await asyncio.get_event_loop().run_in_executor(None, _send)
-
-        return f"邮件已发送至 {recipient}：\n\n> {message}"
-    except ImportError:
-        return f"邮件发送失败：依赖缺失"
+        return f"Email sent to {recipient}: {message}"
     except Exception as e:
-        return f"邮件发送失败：{str(e)}"
+        return f"Email failed: {str(e)}"
+
 
 def search_knowledge(query: str) -> str:
-    """模拟企业知识库搜索"""
     knowledge_base = {
-        "请假": "公司请假流程：1. OA系统提交申请 → 2. 直属领导审批 → 3. 3天以上需人事备案。年假15天，病假需附医院证明。",
-        "报销": "报销流程：贴发票 → OA填写报销单 → 部门审批 → 财务审核 → 打款（5个工作日内）。单笔超5000需副总审批。",
-        "周报": "周报提交截止时间：每周五17:00前。模板请参考OA系统-文档中心-周报模板。",
-        "加班": "加班需提前在OA申请，经审批后方可执行。加班费按国家规定：工作日1.5倍，休息日2倍，节假日3倍。",
+        "leave": "Leave process: 1. Submit in OA -> 2. Manager approval -> 3. HR filing for >3 days. Annual leave: 15 days. Sick leave requires medical certificate.",
+        "reimbursement": "Reimbursement: Submit receipts -> OA form -> Dept approval -> Finance review -> Payment (5 business days). >5000 requires VP approval.",
+        "weekly": "Weekly report deadline: Every Friday 17:00. Template: OA System > Document Center > Weekly Report Template.",
+        "overtime": "Overtime: Apply in OA before working. Pay: 1.5x weekday, 2x weekend, 3x holiday.",
     }
     for key, answer in knowledge_base.items():
-        if key in query:
-            return f"📚 知识库查询结果：\n\n{answer}"
-    return f"📚 知识库中未找到与「{query}」相关的结果。请联系管理员补充。"
+        if key in query.lower():
+            return f"Knowledge Base Result:\n\n{answer}"
+    return f"No results found for '{query}'. Please contact admin."
+
+
+def search_contacts(name: str) -> str:
+    try:
+        import sqlite3, os
+        db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "office.db")
+        conn = sqlite3.connect(db_path)
+        rows = conn.execute("SELECT name, email, department FROM contacts WHERE name LIKE ?", (f"%{name}%",)).fetchall()
+        conn.close()
+        if not rows:
+            return f"No contacts found for '{name}'."
+        result = "Contacts found:\n"
+        for r in rows:
+            result += f"- {r[0]} | {r[1]} | {r[2]}\n"
+        return result
+    except Exception as e:
+        return f"Search failed: {str(e)}"

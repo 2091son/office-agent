@@ -1,44 +1,61 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 办公助手 - 登录</title>
-    <link rel="stylesheet" href="/static/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 办公助手</title>
+  <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
-    <div class="auth-container">
-        <h2>登录</h2>
-        <form id="loginForm">
-            <input type="text" id="username" placeholder="用户名" required>
-            <input type="password" id="password" placeholder="密码" required>
-            <button type="submit" class="btn-primary">登录</button>
-        </form>
-        <p style="text-align:center;margin-top:16px;">
-            没有账号？<a href="/register">注册新账号</a>
-        </p>
-        <p id="error" style="color:red;text-align:center;"></p>
-    </div>
-    <script>
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const resp = await fetch('/api/login', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                username: document.getElementById('username').value,
-                password: document.getElementById('password').value
-            })
-        });
-        const data = await resp.json();
-        if (resp.ok) {
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('username', data.username);
-            window.location.href = '/chat';
-        } else {
-            document.getElementById('error').textContent = data.detail;
-        }
-    });
-    </script>
+  <div class="auth-container" id="loginBox">
+    <h2>登录</h2>
+    <input type="text" id="loginUser" placeholder="用户名"><br><br>
+    <input type="password" id="loginPass" placeholder="密码"><br><br>
+    <button class="btn-primary" onclick="doLogin()">登录</button>
+    <p style="text-align:center;margin-top:12px;">
+      <a href="#" onclick="showRegister()">注册新账号</a>
+    </p>
+    <p id="loginErr" style="color:red;text-align:center;"></p>
+  </div>
+
+  <div class="auth-container" id="regBox" style="display:none;">
+    <h2>注册</h2>
+    <input type="text" id="regUser" placeholder="用户名"><br><br>
+    <input type="password" id="regPass" placeholder="密码"><br><br>
+    <input type="password" id="regPass2" placeholder="确认密码"><br><br>
+    <button class="btn-primary" onclick="doReg()">注册</button>
+    <p style="text-align:center;margin-top:12px;">
+      <a href="#" onclick="showLogin()">返回登录</a>
+    </p>
+    <p id="regErr" style="color:red;text-align:center;"></p>
+  </div>
+
+  <script>
+    async function doLogin() {
+      const r = await fetch('/api/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: document.getElementById('loginUser').value, password: document.getElementById('loginPass').value })
+      });
+      const d = await r.json();
+      if (r.ok) { localStorage.setItem('token', d.token); window.location.href = '/chat'; }
+      else document.getElementById('loginErr').textContent = d.detail;
+    }
+    async function doReg() {
+      const pw = document.getElementById('regPass').value;
+      if (pw !== document.getElementById('regPass2').value) { document.getElementById('regErr').textContent = '密码不一致'; return; }
+      const r = await fetch('/api/register', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: document.getElementById('regUser').value, password: pw })
+      });
+      const d = await r.json();
+      if (r.ok) { alert('注册成功'); showLogin(); }
+      else document.getElementById('regErr').textContent = d.detail;
+    }
+    function showRegister() { document.getElementById('loginBox').style.display = 'none'; document.getElementById('regBox').style.display = 'block'; }
+    function showLogin() { document.getElementById('regBox').style.display = 'none'; document.getElementById('loginBox').style.display = 'block'; }
+  </script>
 </body>
+
 </html>

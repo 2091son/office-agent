@@ -2,68 +2,78 @@
 <html lang="zh-CN">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>管理面板</title>
-  <link rel="stylesheet" href="/static/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
-  <nav>
-    <a href="/chat">AI 办公助手</a>
-    <a href="/admin" style="color:#ea4335;">管理面板</a>
-    <span style="margin-left:auto;color:#888;">管理员</span>
-    <a href="#" onclick="logout()">退出</a>
-  </nav>
-  <main>
-    <div class="result-container">
-      <h1>管理面板</h1>
-      <div id="loading">加载中...</div>
-      <div id="content" style="display:none;">
-        <h2 style="margin-top:24px;">工具使用统计</h2>
-        <table style="width:100%;border-collapse:collapse;margin-bottom:24px;" id="statsTable">
-        </table>
-        <h2>最近操作记录</h2>
-        <table style="width:100%;border-collapse:collapse;" id="logsTable">
-        </table>
-      </div>
-    </div>
-  </main>
-  <script>
-    function logout() {
-      localStorage.removeItem('token');
-      window.location.href = '/';
-    }
+    <nav>
+        <a href="/chat">AI Office</a>
+        <a href="/admin" style="color:#ea4335;">Admin</a>
+        <span style="margin-left:auto;color:#888;">Admin</span>
+        <a href="#" onclick="logout()">Logout</a>
+    </nav>
+    <main>
+        <div class="result-container">
+            <h1>Admin Panel</h1>
 
-    const token = localStorage.getItem('token');
-    if (!token) { window.location.href = '/'; }
+            <button class="btn-primary" style="margin-bottom:16px;" onclick="addContact()">+ Add Contact</button>
+            <h3>Contacts</h3>
+            <div id="contactsList" style="margin-bottom:24px;"></div>
 
-    fetch('/api/admin', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    })
-      .then(r => {
-        if (!r.ok) { document.getElementById('loading').textContent = '无权限访问'; return; }
-        return r.json();
-      })
-      .then(data => {
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('content').style.display = 'block';
+            <h2>Tool Usage Stats</h2>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:24px;" id="statsTable"></table>
 
-        // 统计表
-        let statsHtml = '<tr style="border-bottom:2px solid #e0e0e0;"><th style="text-align:left;padding:8px;">工具</th><th style="text-align:center;padding:8px;">调用次数</th></tr>';
-        data.stats.forEach(s => {
-          statsHtml += `<tr style="border-bottom:1px solid #f0f0f0;"><td style="padding:8px;">${s[0]}</td><td style="text-align:center;padding:8px;">${s[1]}</td></tr>`;
-        });
-        document.getElementById('statsTable').innerHTML = statsHtml;
+            <h2>Recent Logs</h2>
+            <table style="width:100%;border-collapse:collapse;" id="logsTable"></table>
+        </div>
+    </main>
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) { window.location.href = '/'; }
 
-        // 操作记录表
-        let logsHtml = '<tr style="border-bottom:2px solid #e0e0e0;"><th style="text-align:left;padding:8px;">时间</th><th style="text-align:left;padding:8px;">用户</th><th style="text-align:left;padding:8px;">操作</th><th style="text-align:left;padding:8px;">详情</th></tr>';
-        data.logs.forEach(log => {
-          logsHtml += `<tr style="border-bottom:1px solid #f0f0f0;"><td style="padding:8px;">${log.time}</td><td style="padding:8px;">${log.user}</td><td style="padding:8px;">${log.action}</td><td style="padding:8px;">${log.detail || ''}</td></tr>`;
-        });
-        document.getElementById('logsTable').innerHTML = logsHtml;
-      });
-  </script>
+        function addContact() {
+            const name = prompt('Name'); if (!name) return;
+            const email = prompt('Email'); if (!email || !email.includes('@')) { alert('Invalid email'); return; } const dept = prompt('Department') || '';
+            fetch('/api/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ name, email, department: dept }) }).then(() => location.reload());
+        }
+
+        function loadContacts() {
+            fetch('/api/contacts', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(data => {
+                document.getElementById('contactsList').innerHTML = data.map(c => '<div style="padding:4px 0;">' + c.name + ' - ' + c.email + ' (' + c.department + ')</div>').join('');
+            });
+        }
+
+        fetch('/api/admin', { headers: { 'Authorization': 'Bearer ' + token } })
+            .then(r => { if (!r.ok) { document.body.innerHTML = 'No permission'; return; } return r.json(); })
+            .then(data => {
+                let statsHtml = '<tr><th style="text-align:left;padding:8px;">Tool</th><th style="text-align:center;padding:8px;">Count</th></tr>';
+                if (data.stats) data.stats.forEach(s => {
+                    statsHtml += '<tr><td style="padding:8px;">' + s[0] + '</td><td style="text-align:center;padding:8px;">' + s[1] + '</td></tr>';
+                });
+                document.getElementById('statsTable').innerHTML = statsHtml;
+
+                let logsHtml = '<tr><th>Time</th><th>User</th><th>Action</th><th>Detail</th></tr>';
+                if (data.logs) data.logs.forEach(log => {
+                    logsHtml += '<tr><td>' + log.time + '</td><td>' + log.user + '</td><td>' + log.action + '</td><td>' + (log.detail || '') + '</td></tr>';
+                });
+                document.getElementById('logsTable').innerHTML = logsHtml;
+            });
+        loadContacts();
+
+        function logout() { localStorage.removeItem('token'); window.location.href = '/'; }
+        function makeAdmin() {
+            const uid = prompt('输入要升级的用户ID');
+            if (!uid) return;
+            fetch('/api/admin/promote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ user_id: parseInt(uid) })
+            }).then(r => r.json()).then(d => alert(d.message || 'Done'));
+        }
+    </script>
 </body>
 
 </html>
