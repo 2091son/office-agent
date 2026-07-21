@@ -77,6 +77,8 @@
         </div>
         <div class="chat-area">
             <div class="chat-header">
+                <button onclick="exportConv()"
+                    style="float:right;background:none;border:1px solid #ccc;padding:4px 12px;border-radius:4px;cursor:pointer;">Export</button>
                 <h2>AI 办公助手</h2>
                 <p>生成周报 · 整理会议纪要 · 处理表格 · 发送通知 · 搜索知识库</p>
             </div>
@@ -174,6 +176,17 @@
         }
 
         loadConversations();
+        function exportConv() {
+            if (!currentConvId) { alert('No conversation selected'); return; }
+            fetch('/api/conversations/' + currentConvId + '/export')
+                .then(r => r.json()).then(d => {
+                    const blob = new Blob([d.text], { type: 'text/plain' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'conversation.txt';
+                    a.click();
+                });
+        }
     </script>
 </body>
 

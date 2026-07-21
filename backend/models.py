@@ -58,3 +58,10 @@ class Contact(Base):
     email = Column(String(100), nullable=False)
     department = Column(String(50), default="")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class Document(Base):
+    __tablename__ = "documents"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

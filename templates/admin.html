@@ -26,6 +26,11 @@
             <h2>Tool Usage Stats</h2>
             <table style="width:100%;border-collapse:collapse;margin-bottom:24px;" id="statsTable"></table>
 
+            <h2>Documents</h2>
+            <button class="btn-primary" style="margin-bottom:8px;" onclick="addDoc()">+ Add Document</button>
+            <div id="docsList" style="margin-bottom:24px;"></div>
+            <h2>User Management</h2>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:24px;" id="usersTable"></table>
             <h2>Recent Logs</h2>
             <table style="width:100%;border-collapse:collapse;" id="logsTable"></table>
         </div>
@@ -46,6 +51,21 @@
             });
         }
 
+        fetch('/api/admin/users', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(users => {
+            document.getElementById('usersTable').innerHTML = '<tr><th>ID</th><th>Username</th><th>Role</th><th>Created</th><th>Actions</th></tr>'
+                + users.map(u => '<tr><td>' + u.id + '</td><td>' + u.username + '</td><td>' + u.role + '</td><td>' + u.created_at + '</td><td>' + (u.role !== 'admin' ? '<button onclick="promote(' + u.id + ')">Promote</button> ' : '') + '<button onclick="delUser(' + u.id + ')">Delete</button></td></tr>').join('');
+        });
+
+        function addDoc() {
+            const title = prompt('Title'); if (!title) return;
+            const content = prompt('Content (paste text)'); if (!content) return;
+            fetch('/api/documents', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ title, content }) }).then(() => location.reload());
+        }
+        fetch('/api/documents', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(docs => {
+            document.getElementById('docsList').innerHTML = docs.map(d => '<div style="padding:2px 0;">' + d.title + ' (#' + d.id + ')</div>').join('');
+        });
+        function promote(uid) { fetch('/api/admin/promote', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ user_id: uid }) }).then(() => location.reload()); }
+        function delUser(uid) { if (confirm('Delete user ' + uid + '?')) { fetch('/api/admin/users/' + uid, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } }).then(() => location.reload()); } }
         fetch('/api/admin', { headers: { 'Authorization': 'Bearer ' + token } })
             .then(r => { if (!r.ok) { document.body.innerHTML = 'No permission'; return; } return r.json(); })
             .then(data => {

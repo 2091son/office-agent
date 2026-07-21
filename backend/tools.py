@@ -173,17 +173,34 @@ async def send_notification(recipient: str, message: str, priority: str = "norma
 
 
 def search_knowledge(query: str) -> str:
+    """Search internal knowledge base including uploaded documents"""
+    import sqlite3, os
+    db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "office.db")
+    conn = sqlite3.connect(db_path)
+    print(f"[search_knowledge] query: {query}")
+    rows = conn.execute(
+        "SELECT title, content FROM documents WHERE content LIKE ? OR title LIKE ? LIMIT 5",
+        (f"%{query}%", f"%{query}%")
+    ).fetchall()
+    conn.close()
+    
+    if rows:
+        result = "Knowledge base results:\n"
+        for title, content in rows:
+            result += f"\n--- {title} ---\n{content[:500]}\n"
+        return result
+    
+    # Fallback to hardcoded knowledge
     knowledge_base = {
-        "leave": "Leave process: 1. Submit in OA -> 2. Manager approval -> 3. HR filing for >3 days. Annual leave: 15 days. Sick leave requires medical certificate.",
-        "reimbursement": "Reimbursement: Submit receipts -> OA form -> Dept approval -> Finance review -> Payment (5 business days). >5000 requires VP approval.",
-        "weekly": "Weekly report deadline: Every Friday 17:00. Template: OA System > Document Center > Weekly Report Template.",
-        "overtime": "Overtime: Apply in OA before working. Pay: 1.5x weekday, 2x weekend, 3x holiday.",
+        "leave": "Leave process: 1. Submit in OA -> 2. Manager approval -> 3. HR filing for >3 days. Annual leave: 15 days.",
+        "reimbursement": "Reimbursement: Submit receipts -> OA form -> Dept approval -> Finance -> Payment (5 business days).",
+        "weekly": "Weekly report deadline: Every Friday 17:00.",
+        "overtime": "Overtime: Apply in OA. Pay: 1.5x weekday, 2x weekend, 3x holiday.",
     }
     for key, answer in knowledge_base.items():
         if key in query.lower():
-            return f"Knowledge Base Result:\n\n{answer}"
-    return f"No results found for '{query}'. Please contact admin."
-
+            return f"Knowledge Base:\n\n{answer}"
+    return f"No results found for '{query}'."
 
 def search_contacts(name: str) -> str:
     try:

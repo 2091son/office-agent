@@ -9,6 +9,7 @@ from backend.models import User, OperationLog, Conversation, Message, Contact
 from backend.auth import hash_password, create_token, get_current_user, require_admin
 from backend.agent import run_agent
 from backend import init_db
+from backend.models import Document
 
 init_db()
 app = FastAPI()
@@ -172,6 +173,41 @@ async def websocket_chat(websocket: WebSocket):
                 await websocket.send_text(json.dumps({"type":"error","content":f"Error: {str(e)}"}))
     except WebSocketDisconnect:
         pass
+
+@app.get("/api/admin/users")
+async def list_users(current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    users = db.query(User).all()
+    return [{"id": u.id, "username": u.username, "role": u.role, "created_at": u.created_at.strftime('%m-%d')} for u in users]
+
+@app.delete("/api/admin/users/{uid}")
+async def delete_user(uid: int, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    if uid == current_user.id: raise HTTPException(400, "Cannot delete yourself")
+    user = db.query(User).filter(User.id == uid).first()
+    if not user: raise HTTPException(404, "Not found")
+    db.delete(user); db.commit()
+    return {"message": "Deleted"}
+
+@app.get("/api/conversations/{conv_id}/export")
+async def export_conversation(conv_id: int, db: Session = Depends(get_db)):
+    msgs = db.query(Message).filter(Message.conversation_id == conv_id).order_by(Message.created_at).all()
+    conv = db.query(Conversation).filter(Conversation.id == conv_id).first()
+    text = f"Conversation: {conv.title if conv else 'Unknown'}\n{'='*40}\n\n"
+    for m in msgs:
+        role = "User" if m.role == "user" else "AI"
+        text += f"[{role}] {m.created_at.strftime('%m-%d %H:%M')}\n{m.content}\n\n"
+    return {"text": text}
+
+@app.post("/api/documents")
+async def add_document(request: Request, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
+    data = await request.json()
+    doc = Document(title=data.get("title",""), content=data.get("content",""))
+    db.add(doc); db.commit()
+    return {"id": doc.id}
+
+@app.get("/api/documents")
+async def list_documents(db: Session = Depends(get_db)):
+    docs = db.query(Document).all()
+    return [{"id": d.id, "title": d.title} for d in docs]
 
 if __name__ == "__main__":
     import uvicorn
