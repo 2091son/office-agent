@@ -18,25 +18,25 @@ templates = Jinja2Templates(directory="templates")
 
 LOGIN_HTML = """<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"><title>AI Office</title><link rel="stylesheet" href="/static/style.css"></head><body>
 <div class="auth-container" id="loginBox">
-<h2>Login</h2>
-<input type="text" id="loginUser" placeholder="Username"><br><br>
-<input type="password" id="loginPass" placeholder="Password"><br><br>
-<button class="btn-primary" onclick="doLogin()">Login</button>
-<p style="text-align:center;margin-top:12px;"><a href="#" onclick="showReg()">Register</a></p>
+<h2>登录</h2>
+<input type="text" id="loginUser" placeholder="用户名" minlength="3" required><br><br>
+<input type="password" id="loginPass" placeholder="密码" minlength="6" required><br><br>
+<button class="btn-primary" onclick="doLogin()">登录</button>
+<p style="text-align:center;margin-top:12px;"><a href="#" onclick="showReg()">注册新账号</a></p>
 <p id="loginErr" style="color:red;"></p>
 </div>
 <div class="auth-container" id="regBox" style="display:none;">
-<h2>Register</h2>
-<input type="text" id="regUser" placeholder="Username"><br><br>
-<input type="password" id="regPass" placeholder="Password"><br><br>
-<input type="password" id="regPass2" placeholder="Confirm"><br><br>
-<button class="btn-primary" onclick="doReg()">Register</button>
-<p style="text-align:center;margin-top:12px;"><a href="#" onclick="showLogin()">Back</a></p>
+<h2>注册</h2>
+<input type="text" id="regUser" placeholder="用户名（3-20位）" minlength="3" maxlength="20" required><br><br>
+<input type="password" id="regPass" placeholder="密码（至少6位）" minlength="6" required><br><br>
+<input type="password" id="regPass2" placeholder="确认密码"><br><br>
+<button class="btn-primary" onclick="doReg()">注册</button>
+<p style="text-align:center;margin-top:12px;"><a href="#" onclick="showLogin()">返回登录</a></p>
 <p id="regErr" style="color:red;"></p>
 </div>
 <script>
-async function doLogin(){const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('loginUser').value,password:document.getElementById('loginPass').value})});const d=await r.json();if(r.ok){localStorage.setItem('token',d.token);localStorage.setItem('role',d.role);localStorage.setItem('userId',d.user_id);window.location.href='/chat';}else document.getElementById('loginErr').textContent=d.detail;}
-async function doReg(){const pw=document.getElementById('regPass').value;if(pw!==document.getElementById('regPass2').value){document.getElementById('regErr').textContent='Mismatch';return;}const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('regUser').value,password:pw})});const d=await r.json();if(r.ok){alert('Done');showLogin();}else document.getElementById('regErr').textContent=d.detail;}
+async function doLogin(){const u=document.getElementById('loginUser').value.trim();const p=document.getElementById('loginPass').value;if(u.length<3){document.getElementById('loginErr').textContent='用户名至少3位';return;}if(p.length<6){document.getElementById('loginErr').textContent='密码至少6位';return;}const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});const d=await r.json();if(r.ok){localStorage.setItem('token',d.token);localStorage.setItem('role',d.role);localStorage.setItem('userId',d.user_id);window.location.href='/chat';}else document.getElementById('loginErr').textContent=d.detail;}
+async function doReg(){const u=document.getElementById('regUser').value.trim();const pw=document.getElementById('regPass').value;if(u.length<3){document.getElementById('regErr').textContent='用户名至少3位';return;}if(!/^[a-zA-Z0-9_\u4e00-\u9fff]+$/.test(u)){document.getElementById('regErr').textContent='用户名只能包含中英文、数字和下划线';return;}if(pw.length<6){document.getElementById('regErr').textContent='密码至少6位';return;}if(pw!==document.getElementById('regPass2').value){document.getElementById('regErr').textContent='两次密码不一致';return;}const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:pw})});const d=await r.json();if(r.ok){alert('注册成功，请登录');showLogin();}else document.getElementById('regErr').textContent=d.detail;}
 function showReg(){document.getElementById('loginBox').style.display='none';document.getElementById('regBox').style.display='block';}
 function showLogin(){document.getElementById('regBox').style.display='none';document.getElementById('loginBox').style.display='block';}
 </script></body></html>"""
