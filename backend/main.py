@@ -63,6 +63,17 @@ async def api_register(request: Request, db: Session = Depends(get_db)):
     db.add(user); db.commit()
     return {"message": "OK"}
 
+
+@app.get("/api/download/{filename:path}")
+async def download_export(filename: str):
+    import os
+    from fastapi.responses import FileResponse
+    exports_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "exports")
+    filepath = os.path.join(exports_dir, filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(404, "File not found")
+    return FileResponse(filepath, filename=filename, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
 @app.post("/api/login")
 async def api_login(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
@@ -86,19 +97,22 @@ async def api_admin(current_user: User = Depends(require_admin), db: Session = D
     return {"stats": [(s[0], s[1]) for s in stats], "logs": [{"time": log.created_at.strftime('%m-%d %H:%M'), "user": log.user.username, "action": log.action, "detail": log.detail[:50] if log.detail else ""} for log in logs]}
 
 @app.get("/api/conversations")
-async def list_conversations(db: Session = Depends(get_db)):
-    convs = db.query(Conversation).order_by(Conversation.created_at.desc()).all()
+async def list_conversations(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    convs = db.query(Conversation).filter(Conversation.user_id == current_user.id).order_by(Conversation.created_at.desc()).all()
     return [{"id": c.id, "title": c.title} for c in convs]
 
 @app.get("/api/conversations/{conv_id}")
-async def get_conversation(conv_id: int, db: Session = Depends(get_db)):
+async def get_conversation(conv_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    conv = db.query(Conversation).filter(Conversation.id == conv_id, Conversation.user_id == current_user.id).first()
+    if not conv:
+        return []
     msgs = db.query(Message).filter(Message.conversation_id == conv_id).all()
     return [{"role": m.role, "content": m.content} for m in msgs]
 
 @app.post("/api/conversations")
-async def create_conversation(request: Request, db: Session = Depends(get_db)):
+async def create_conversation(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     data = await request.json()
-    conv = Conversation(user_id=1, title=data.get("title","New")[:30])
+    conv = Conversation(user_id=current_user.id, title=data.get("title","New")[:30])
     db.add(conv); db.commit()
     return {"id": conv.id}
 

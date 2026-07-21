@@ -30,12 +30,6 @@
             <h2>工具使用统计</h2>
             <table id="statsTable"></table>
 
-            <h2>知识库文档</h2>
-            <button class="btn-primary" onclick="addDoc()">+ 添加文档</button>
-            <input type="file" id="fileInput" accept=".txt,.pdf,.docx" style="display:none;" onchange="uploadFile()">
-            <button class="btn-primary" onclick="document.getElementById('fileInput').click()">上传文件</button>
-            <div id="docsList"></div>
-
             <h2>用户管理</h2>
             <table id="usersTable"></table>
 
@@ -59,19 +53,6 @@
             fetch('/api/reminder/test', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(d => alert(d.message));
         }
 
-        function addDoc() {
-            const title = prompt('标题'); if (!title) return;
-            const content = prompt('内容（粘贴文本）'); if (!content) return;
-            fetch('/api/documents', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ title, content }) }).then(() => location.reload());
-        }
-
-        async function uploadFile() {
-            const file = document.getElementById('fileInput').files[0];
-            if (!file) return;
-            const form = new FormData(); form.append('file', file);
-            const r = await fetch('/api/documents/upload', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: form });
-            if (r.ok) { location.reload(); } else { alert('上传失败'); }
-        }
         function promote(uid) { if (!confirm('确定将该用户升级为管理员？')) return; fetch('/api/admin/promote', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ user_id: uid }) }).then(() => location.reload()); }
         function delUser(uid) { if (confirm('确定删除用户 ' + uid + '?')) { fetch('/api/admin/users/' + uid, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } }).then(() => location.reload()); } }
 
@@ -82,10 +63,6 @@
         fetch('/api/admin/users', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(users => {
             document.getElementById('usersTable').innerHTML = '<tr><th>ID</th><th>用户名</th><th>角色</th><th>注册时间</th><th>操作</th></tr>'
                 + users.map(u => '<tr><td>' + u.id + '</td><td>' + u.username + '</td><td>' + u.role + '</td><td>' + u.created_at + '</td><td>' + (u.role !== 'admin' ? '<button onclick="promote(' + u.id + ')">升级</button> ' : '') + (u.role !== 'admin' ? '<button onclick="delUser(' + u.id + ')">删除</button>' : '')).join('');
-        });
-
-        fetch('/api/documents', { headers: { 'Authorization': 'Bearer ' + token } }).then(r => r.json()).then(docs => {
-            document.getElementById('docsList').innerHTML = docs.map(d => '<div>' + d.title + ' (#' + d.id + ') <button onclick="editDoc(' + d.id + ',\'' + d.title + '\')">编辑</button> <button onclick="delDoc(' + d.id + ')">删除</button></div>').join('');
         });
 
         fetch('/api/admin', { headers: { 'Authorization': 'Bearer ' + token } })
@@ -107,16 +84,6 @@
         });
 
         function logout() { localStorage.removeItem('token'); window.location.href = '/'; }
-        function editDoc(id, oldTitle) {
-            const title = prompt('标题', oldTitle); if (!title) return;
-            const content = prompt('内容（粘贴文本）');
-            if (content === null) return;
-            fetch('/api/documents/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ title, content: content || undefined }) }).then(() => location.reload());
-        }
-        function delDoc(id) {
-            if (!confirm('确定删除文档 #' + id + '?')) return;
-            fetch('/api/documents/' + id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } }).then(() => location.reload());
-        }
     </script>
 </body>
 

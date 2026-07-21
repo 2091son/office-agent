@@ -115,7 +115,14 @@
         function addMessage(role, content) {
             const div = document.createElement('div');
             div.className = `message ${role}`;
-            div.innerHTML = `<div class="message-content">${content.replace(/\n/g, '<br>')}</div>`;
+            const linked = content
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/\[([^\]]+)\]\((\/static\/exports\/[^)]+)\)/g, '<a href="$2" download>📥 $1</a>')
+                .replace(/\[([^\]]+)\]\((\/api\/download\/[^)]+)\)/g, '<a href="$2" download>📥 $1</a>')
+                .replace(/(\/api\/download\/[^\s。，,)】]+)/g, '<a href="$1" download>📥 下载文件</a>')
+                .replace(/(\/static\/exports\/[^\s。，,)]+)/g, '<a href="$1" download>📥 下载文件</a>')
+                .replace(/\n/g, '<br>');
+            div.innerHTML = `<div class="message-content">${linked}</div>`;
             document.getElementById('chatMessages').appendChild(div);
             div.scrollIntoView({ behavior: 'smooth' });
         }
@@ -238,7 +245,7 @@
                 body: formData
             }).then(r => r.json()).then(d => {
                 if (d.detail) { addMessage('error', '上传失败: ' + d.detail); return; }
-                addMessage('system', '✅ 文件已上传: ' + d.title + '（文档 ID: ' + d.id + '）。现在可以在聊天中问我关于这个文件的内容。');
+                addMessage('system', '✅ ' + d.title + ' 已上传，现在可以在聊天中问我关于这个文件的内容。');
             }).catch(e => {
                 addMessage('error', '文件上传失败: ' + e.message);
             });

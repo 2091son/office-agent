@@ -335,7 +335,7 @@ def search_knowledge(query: str) -> str:
 
     # Try exact match first
     rows = conn.execute(
-        "SELECT id, title, content FROM documents WHERE content LIKE ? OR title LIKE ? LIMIT 5",
+        "SELECT id, title, content FROM documents WHERE content LIKE ? OR title LIKE ? ORDER BY id DESC LIMIT 5",
         (f"%{query}%", f"%{query}%")
     ).fetchall()
 
@@ -344,7 +344,7 @@ def search_knowledge(query: str) -> str:
         for ch in query:
             if len(ch.strip()) < 1: continue
             rows = conn.execute(
-                "SELECT id, title, content FROM documents WHERE content LIKE ? OR title LIKE ? LIMIT 5",
+                "SELECT id, title, content FROM documents WHERE content LIKE ? OR title LIKE ? ORDER BY id DESC LIMIT 5",
                 (f"%{ch}%", f"%{ch}%")
             ).fetchall()
             if rows: break
@@ -449,7 +449,9 @@ def export_filtered_excel(document_id: int, column: str, condition: str, filenam
 
     exports_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "exports")
     os.makedirs(exports_dir, exist_ok=True)
-    filepath = os.path.join(exports_dir, filename)
+    import time
+    safe_name = f"export_{int(time.time())}.xlsx"
+    filepath = os.path.join(exports_dir, safe_name)
     wb.save(filepath)
 
-    return f"已生成筛选结果文件: {filename}（{len(matched)} 条记录）。下载链接: /static/exports/{filename}"
+    return f"已生成筛选结果文件（{len(matched)} 条记录，条件: {column} {condition}）。下载链接: /api/download/{safe_name}"
